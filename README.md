@@ -15,3 +15,4 @@ Estudiante de Ingenieria Multimedia, vivo en Tunja, me atrea la parte de creacio
 Productor musical, estudiante de ingeniería, resido en Sogamoso. No sé, solo vivo para la música.
 Hago música, diseño cosas y a veces entiendo lo que estoy haciendo. Si no, finjo bien.
 \"Busy streets and busy lives, and all we know is touch and go.\" - T.S
+
