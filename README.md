@@ -10,3 +10,8 @@ Estudiante de Ingenieria Multimedia, vivo en Bogotá, me atrea la parte de creac
 
 ### Oscar Eduardo Velandia Tolosa 
 Estudiante de Ingenieria Multimedia, vivo en Tunja, me atrea la parte de creacion de imagenes y tipografias, tengo conocimientos en Adobe Photoshop, Premier y blender, soy tecnico profesional en fotografia y Tecnologo en multimedia.
+
+### Cristian Arguello
+Productor musical, estudiante de ingeniería, resido en Sogamoso. No sé, solo vivo para la música.
+Hago música, diseño cosas y a veces entiendo lo que estoy haciendo. Si no, finjo bien.
+"Busy streets and busy lives, and all we know is touch and go." – T.S
