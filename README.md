@@ -16,5 +16,5 @@ Productor musical, estudiante de ingeniería, resido en Sogamoso. No sé, solo v
 Hago música, diseño cosas y a veces entiendo lo que estoy haciendo. Si no, finjo bien.
 \"Busy streets and busy lives, and all we know is touch and go.\" - T.S
 
-###Juan Esteban Guerrero León
+### Juan Esteban Guerrero León
 Soy Tecnólogo en Producción Multimedia del SENA y actualmente me desempeño como Productor Multimedia y Audiovisual y soy estudiante de Ingeniería Multimedia, resido en la ciudad de Tunja, Cuento con conocimientos en áreas de diseño gráfico, audiovisual, y temas básicos en el modelado 3D.
