@@ -1,0 +1,286 @@
+//Gestor de cuadricula/GridManager.cs
+// Este script se encarga de generar y manejar la lógica de un grid para un juego en Unity.
+// Tiene funciones para crear el grid, detectar coincidencias en línea, eliminar tiles coincidentes,
+// y colapsar el grid para llenar los espacios vacíos después de una eliminación.
+
+using UnityEngine;
+using System.Collections.Generic;
+
+public class GridManager : MonoBehaviour
+{
+    // Definimos las dimensiones de la cuadrícula (grid)
+    public int width = 6;
+    public int height = 8;
+    
+    // Prefab que usaremos para instanciar cada tile
+    public GameObject tilePrefab;
+    
+    // Factor de separación entre cada tile, puede ajustar para modificar el espacio visual
+    public float spacing = 1.1f;
+
+    // Almacenamos todos los tiles generados en una matriz para fácil acceso
+    private GameObject[,] tileGrid;
+
+    // ------------------------------------------------------------------------------------------
+    // MÉTODO: Start
+    // ------------------------------------------------------------------------------------------
+    // Unity invoca este método al iniciar la escena, lo que nos permite inicializar el grid.
+    void Start()
+    {
+        GenerateGrid();
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // MÉTODO: GenerateGrid
+    // ------------------------------------------------------------------------------------------
+    // Este método se encarga de generar la cuadrícula de tiles.
+    // Inicializa la matriz del tamaño definido, instancia cada tile en su lugar y le asigna un color.
+    // Además, asigna la posición en el grid (gridPosition) y guarda el color original.
+    void GenerateGrid()
+    {
+        // Inicializamos la matriz de tiles con las dimensiones definidas
+        tileGrid = new GameObject[width, height];
+
+        // Array de colores disponibles para asignar de manera aleatoria a cada tile.
+        // Puedes modificar o agregar más colores si lo deseas.
+        Color[] colors = new Color[] {
+            Color.red,
+            Color.green,
+            Color.blue,
+            Color.yellow,
+            Color.magenta,
+            Color.cyan
+        };
+
+        // Bucles dobles para recorrer cada posición del grid en (x,y)
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                // Calcula la posición donde se instanciará el tile, considerando el espaciado deseado.
+                Vector2 spawnPosition = new Vector2(x * spacing, y * spacing);
+                
+                // Instancia el prefab en la posición calculada y lo asigna como hijo del objeto actual.
+                GameObject tile = Instantiate(tilePrefab, spawnPosition, Quaternion.identity, transform);
+
+                // Selecciona un color aleatorio del arreglo para personalizar cada tile.
+                Color randomColor = colors[Random.Range(0, colors.Length)];
+                tile.GetComponent<SpriteRenderer>().color = randomColor;
+
+                // Configura el componente TileClick del tile:
+                // - Asigna la posición del tile dentro de la matriz.
+                // - Guarda el color original para poder compararlo más tarde.
+                TileClick tileClick = tile.GetComponent<TileClick>();
+                tileClick.gridPosition = new Vector2Int(x, y);
+                tileClick.originalColor = randomColor;
+
+                // Guarda el tile en nuestra matriz para poder acceder a él fácilmente después.
+                tileGrid[x, y] = tile;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // MÉTODO: GetGrid
+    // ------------------------------------------------------------------------------------------
+    // Método público para devolver la matriz de tiles. Útil para otras clases que necesiten acceder al grid.
+    public GameObject[,] GetGrid() => tileGrid;
+
+    // ------------------------------------------------------------------------------------------
+    // MÉTODO: CheckDirectMatch
+    // ------------------------------------------------------------------------------------------
+    // Revisa una línea (horizontal o vertical) en el grid para encontrar coincidencias directas
+    // (es decir, secuencias de 3 o más tiles con el mismo color).
+    // posA y posB representan dos posiciones involucradas en un movimiento, y se determina la dirección
+    // del movimiento basándose en estos.
+    public void CheckDirectMatch(Vector2Int posA, Vector2Int posB)
+    {
+        List<GameObject> matches = new();
+
+        // Determinar la dirección del movimiento: si ambos tiles están en la misma fila,
+        // el movimiento es horizontal; de lo contrario, vertical.
+        bool isHorizontal = posA.y == posB.y;
+
+        // Se selecciona la línea a chequear:
+        // Si es horizontal, se busca coincidencia en la fila 'posA.y'
+        // Si es vertical, se busca coincidencia en la columna 'posA.x'
+        if (isHorizontal)
+            matches = GetLineMatch(posA.y, true);
+        else
+            matches = GetLineMatch(posA.x, false);
+
+        // Verifica si hay al menos 3 tiles que coinciden en la línea.
+        if (matches.Count >= 3)
+        {
+            // Para cada tile coincidente, procedemos a eliminarlo o activar su efecto de destrucción.
+            foreach (GameObject tile in matches)
+            {
+                // Si el tile ya es nulo (posiblemente destruido anteriormente), lo ignoramos.
+                if (tile == null) continue;
+
+                // Buscamos el componente TileClick, el cual contiene la posición en la cuadrícula.
+                TileClick click = tile.GetComponent<TileClick>();
+                if (click != null)
+                    // Actualizamos la matriz para reflejar la eliminación del tile.
+                    tileGrid[click.gridPosition.x, click.gridPosition.y] = null;
+
+                // Intenta reproducir un efecto visual de destrucción.
+                TileEffect effect = tile.GetComponent<TileEffect>();
+                if (effect != null)
+                    effect.PlayDestroyEffect();
+                else
+                    // Si no hay efecto, simplemente destruye el objeto.
+                    Destroy(tile);
+            }
+
+            // Después de una breve demora, se llama a la función que hace colapsar el grid para llenar los huecos.
+            // Aquí usamos Invoke para programar la llamada luego de 0.4 segundos.
+            Invoke(nameof(DelayedInitialCollapse), 0.4f);
+        }
+        else
+        {
+            // Si no se encontraron coincidencias suficientes, se notifica en la consola.
+            Debug.Log("No se encontraron coincidencias directas.");
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // MÉTODO: GetLineMatch
+    // ------------------------------------------------------------------------------------------
+    // Revisa una línea completa del grid (ya sea horizontal o vertical) en busca de
+    // secuencias de tiles que tengan el mismo color.
+    // fixedIndex: es el índice fijo de la fila o columna que estamos revisando.
+    // horizontal: si es verdadero, revisa una fila; si es falso, revisa una columna.
+    List<GameObject> GetLineMatch(int fixedIndex, bool horizontal)
+    {
+        // Lista para guardar los tiles en la línea actual
+        List<GameObject> currentLine = new();
+        // Variable para almacenar el color anterior que encontramos
+        Color? lastColor = null;
+        // Lista temporal para almacenar una secuencia de coincidencias
+        List<GameObject> matchTemp = new();
+        // Lista final que contendrá todos los tiles que conforman coincidencias válidas (3 o más)
+        List<GameObject> finalMatches = new();
+
+        // Recorre la línea (sea la anchura o la altura, dependiendo de la dirección)
+        for (int i = 0; i < (horizontal ? width : height); i++)
+        {
+            // Recupera el tile actual basado en si estamos leyendo horizontal o verticalmente.
+            GameObject tile = horizontal ? tileGrid[i, fixedIndex] : tileGrid[fixedIndex, i];
+
+            // Si el tile es nulo (ya fue eliminado), reinicia la secuencia temporal y el color de referencia.
+            if (tile == null) {
+                matchTemp.Clear();
+                lastColor = null;
+                continue;
+            }
+
+            // Obtiene el color original del tile desde el componente TileClick.
+            Color tileColor = tile.GetComponent<TileClick>().originalColor;
+
+            // Si el color del tile es el mismo que el anterior, se añade a la secuencia.
+            if (tileColor == lastColor)
+            {
+                matchTemp.Add(tile);
+            }
+            else
+            {
+                // Si la secuencia previa tiene 3 o más tiles, se añade a la lista de coincidencias finales.
+                if (matchTemp.Count >= 3)
+                    finalMatches.AddRange(matchTemp);
+
+                // Reinicia la lista temporal con el tile actual
+                matchTemp = new List<GameObject> { tile };
+                // Actualiza el color de referencia al color actual del tile.
+                lastColor = tileColor;
+            }
+        }
+
+        // Al finalizar el bucle, se verifica por si queda una secuencia que cumpla la condición.
+        if (matchTemp.Count >= 3)
+            finalMatches.AddRange(matchTemp);
+
+        // Retorna la lista final sin duplicados.
+        return new List<GameObject>(new HashSet<GameObject>(finalMatches));
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // MÉTODO: DelayedInitialCollapse
+    // ------------------------------------------------------------------------------------------
+    // Método auxiliar que se encarga de iniciar el colapso del grid luego de una demora
+    // (esto permite que se vean las animaciones de destrucción antes de mover los tiles).
+    void DelayedInitialCollapse()
+    {
+        CollapseGrid(true);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // MÉTODO: CollapseGrid
+    // ------------------------------------------------------------------------------------------
+    // Este método se encarga de hacer "colapsar" el grid, es decir, mover los tiles hacia abajo para
+    // llenar los espacios que quedaron vacíos tras la eliminación de algunos tiles.
+    // isInitialCollapse: bandera para saber si es la primera vez que se colapsa el grid,
+    // de forma que se puedan chequear coincidencias adicionales luego.
+    public void CollapseGrid(bool isInitialCollapse)
+    {
+        // Recorre cada columna del grid
+        for (int x = 0; x < width; x++)
+        {
+            // Se comienza desde la segunda fila ya que la primera no puede moverse hacia abajo.
+            for (int y = 1; y < height; y++)
+            {
+                // Si no hay un tile en la posición actual, saltamos este paso.
+                if (tileGrid[x, y] == null) continue;
+
+                int targetY = y;
+                // Busca el espacio vacío más bajo en la columna para el tile actual.
+                while (targetY > 0 && tileGrid[x, targetY - 1] == null)
+                    targetY--;
+
+                // Si se encontró un espacio más abajo que la posición actual...
+                if (targetY != y)
+                {
+                    // Se mueve el tile en la matriz y se actualiza su referencia.
+                    GameObject tile = tileGrid[x, y];
+                    tileGrid[x, targetY] = tile;
+                    tileGrid[x, y] = null;
+
+                    // Actualiza la posición interna del tile (gridPosition) y su posición en el mundo.
+                    tile.GetComponent<TileClick>().gridPosition = new Vector2Int(x, targetY);
+                    tile.transform.position = new Vector2(x * spacing, targetY * spacing);
+                }
+            }
+        }
+
+        // Si es la primera vez que se colapsa el grid, se programa la verificación de coincidencias
+        // para ver si se formaron nuevas secuencias con los tiles en sus nuevas posiciones.
+        if (isInitialCollapse)
+            Invoke("CheckFullGridForMatches", 0.2f);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // MÉTODO: CheckFullGridForMatches
+    // ------------------------------------------------------------------------------------------
+    // Revisa la cuadrícula completa en busca de nuevas coincidencias.
+    // Aquí se recopilan las posiciones de los tiles presentes para, potencialmente, aplicar efectos de
+    // "cascada" o iniciar otra verificación de coincidencias.
+    void CheckFullGridForMatches()
+    {
+        // Lista para almacenar todas las posiciones en las que hay un tile
+        List<Vector2Int> positionsToCheck = new();
+
+        // Recorre todo el grid y añade las posiciones en las que hay un tile activo.
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                if (tileGrid[x, y] != null)
+                    positionsToCheck.Add(new Vector2Int(x, y));
+            }
+        }
+
+        // Aquí puedes insertar la llamada a tu función antigua
+        // o implementar la lógica para una cascada de coincidencias globales, si es que lo deseas.
+        // Por ahora, solo recopilamos las posiciones.
+    }
+}
