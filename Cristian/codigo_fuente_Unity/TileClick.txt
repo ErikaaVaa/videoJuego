@@ -1,0 +1,141 @@
+using UnityEngine;
+
+/// <summary>
+/// TileClick.cs - Script para gestionar la interacción con un tile en el grid.
+/// Permite seleccionar un tile al hacer click, resaltarlo, y realizar intercambios (swaps)
+/// entre tiles adyacentes, además de actualizar la lógica del grid para detectar coincidencias.
+/// </summary>
+public class TileClick : MonoBehaviour
+{
+    // La posición del tile en el grid (usamos coordenadas enteras para ubicarlo)
+    public Vector2Int gridPosition;
+
+    // Color original del tile, que nos permitirá restaurar su apariencia después de alguna selección.
+    public Color originalColor;
+
+    // Componente SpriteRenderer para cambiar el color del tile (útil para resaltar selección, etc.)
+    private SpriteRenderer sr;
+
+    // Tile seleccionado actualmente: usaremos una variable estática para manejar una única selección a la vez.
+    private static TileClick selectedTile;
+
+    // Referencia estática al GridManager para poder actualizar el estado del grid global cuando se realice un swap.
+    private static GridManager gridManager;
+
+    // ------------------------------------------------------------------------------------------
+    // MÉTODO: Start
+    // ------------------------------------------------------------------------------------------
+    // Se invoca al inicio de la escena, lo que nos permite inicializar componentes y variables.
+    private void Start()
+    {
+        // Obtenemos el componente SpriteRenderer que está unido a este objeto,
+        // lo necesitaremos para modificar el color del tile.
+        sr = GetComponent<SpriteRenderer>();
+
+        // Guardamos el color original del tile para poder restaurarlo luego si es necesario.
+        originalColor = sr.color;
+
+        // Buscamos el GridManager en la escena, pero solo si aún no ha sido asignado.
+        // Esto evita múltiples búsquedas costosas y garantiza que todos los tiles usen el mismo GridManager.
+        if (gridManager == null)
+            gridManager = FindAnyObjectByType<GridManager>();
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // MÉTODO: OnMouseDown
+    // ------------------------------------------------------------------------------------------
+    // Se llama cuando el usuario hace click con el mouse sobre el tile.
+    // Gestiona la lógica de selección, intercambio y deselección de un tile.
+    private void OnMouseDown()
+    {
+        // Si ningún tile está seleccionado, marcamos este tile como el seleccionado y lo resaltamos.
+        if (selectedTile == null)
+        {
+            selectedTile = this;
+            sr.color = Color.white; // Cambio de color para indicar la selección.
+        }
+        else
+        {
+            // Si el usuario hace click en el mismo tile ya seleccionado, se deselecciona y se restaura su color.
+            if (selectedTile == this)
+            {
+                ResetColor();
+                selectedTile = null;
+                return;
+            }
+
+            // Si el tile actual y el tile seleccionado son adyacentes (vecinos), procedemos a intercambiarlos.
+            if (AreAdjacent(this, selectedTile))
+            {
+                SwapTiles(this, selectedTile);
+            }
+
+            // Luego de intentar el swap o si los tiles no son adyacentes,
+            // restablecemos el color de ambos tiles para indicar que la selección ha terminado.
+            selectedTile.ResetColor();
+            this.ResetColor();
+            // Limpiamos la selección.
+            selectedTile = null;
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // MÉTODO: ResetColor
+    // ------------------------------------------------------------------------------------------
+    // Restaura el color del SpriteRenderer al color original del tile.
+    void ResetColor()
+    {
+        sr.color = originalColor;
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // MÉTODO: AreAdjacent
+    // ------------------------------------------------------------------------------------------
+    // Comprueba si dos tiles están adyacentes en el grid. La adyacencia se define como:
+    // - La diferencia en la coordenada x es 1 y en y es 0, o viceversa.
+    // Retorna verdadero si los tiles son vecinos horizontal o verticalmente.
+    bool AreAdjacent(TileClick a, TileClick b)
+    {
+        // Calcula la diferencia absoluta en x e y.
+        int dx = Mathf.Abs(a.gridPosition.x - b.gridPosition.x);
+        int dy = Mathf.Abs(a.gridPosition.y - b.gridPosition.y);
+        // Verifica si están uno al lado del otro (sin diagonal).
+        return (dx == 1 && dy == 0) || (dx == 0 && dy == 1);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // MÉTODO: SwapTiles
+    // ------------------------------------------------------------------------------------------
+    // Intercambia la posición física y lógica de dos tiles adyacentes.
+    // Esto incluye:
+    // - Intercambiar las posiciones en el mundo.
+    // - Intercambiar las posiciones en el grid (las coordenadas en gridPosition).
+    // - Actualizar la matriz del grid en GridManager para mantener la coherencia.
+    // - Llamar a la función para comprobar coincidencias tras el intercambio.
+    void SwapTiles(TileClick a, TileClick b)
+    {
+        // Guardamos las posiciones actuales en el mundo para ambos tiles.
+        Vector3 posA = a.transform.position;
+        Vector3 posB = b.transform.position;
+        // Guardamos las posiciones actuales dentro del grid.
+        Vector2Int gridPosA = a.gridPosition;
+        Vector2Int gridPosB = b.gridPosition;
+
+        // Intercambiamos las posiciones en el espacio del juego.
+        a.transform.position = posB;
+        b.transform.position = posA;
+
+        // Intercambiamos las posiciones lógicas dentro del grid.
+        a.gridPosition = gridPosB;
+        b.gridPosition = gridPosA;
+
+        // Obtenemos la matriz del grid desde el GridManager para actualizarla.
+        GameObject[,] grid = gridManager.GetGrid();
+        // Actualizamos la matriz, colocando cada tile en su nueva posición.
+        grid[a.gridPosition.x, a.gridPosition.y] = a.gameObject;
+        grid[b.gridPosition.x, b.gridPosition.y] = b.gameObject;
+
+        // Llamamos a la función del GridManager para revisar si el swap generó coincidencias directas.
+        gridManager.CheckDirectMatch(a.gridPosition, b.gridPosition);
+    }
+}
