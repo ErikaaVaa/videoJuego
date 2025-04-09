@@ -1,0 +1,73 @@
+using UnityEngine;
+using System.Collections;
+
+/// <summary>
+/// TileEffect.cs
+/// Este script se encarga de reproducir un efecto visual y sonoro cuando se destruye un tile.
+/// La idea es que al destruirse se reproduzca un sonido y se ejecute una animación de "pop" que hace crecer ligeramente el tile antes de eliminarlo.
+/// </summary>
+public class TileEffect : MonoBehaviour
+{
+    // Clip de audio que se reproducirá cuando el tile se destruya.
+    public AudioClip destroySound;
+
+    // Bandera para asegurarnos de que el efecto de destrucción solo se ejecute una vez.
+    private bool isBeingDestroyed = false;
+
+    /// <summary>
+    /// Método público para reproducir el efecto de destrucción.
+    /// Verifica si el tile ya se encuentra en proceso de destrucción para evitar múltiples llamadas.
+    /// </summary>
+    public void PlayDestroyEffect()
+    {
+        // Si ya se está destruyendo, no hacemos nada.
+        if (isBeingDestroyed) return;
+
+        // Marcamos el tile como en proceso de destrucción para prevenir duplicados.
+        isBeingDestroyed = true;
+
+        // Reproduce el sonido de destrucción en la posición del tile.
+        // Esto es ideal para dar feedback sonoro a la acción.
+        AudioSource.PlayClipAtPoint(destroySound, transform.position);
+
+        // Inicia la corrutina para ejecutar la animación "pop".
+        StartCoroutine(PopEffect());
+    }
+
+    /// <summary>
+    /// Corrutina que maneja la animación "pop" del tile.
+    /// Realiza una interpolación (lerp) de la escala original a una escala mayor para dar una sensación de explosión.
+    /// Una vez finalizada la animación, el objeto se destruye.
+    /// </summary>
+    private IEnumerator PopEffect()
+    {
+        // Guarda la escala original del tile.
+        Vector3 originalScale = transform.localScale;
+        // Define la escala objetivo aumentando en un 30% el tamaño original.
+        Vector3 targetScale = originalScale * 1.3f;
+
+        // Duración de la animación "pop" (muy rápida, apenas 0.1 segundos).
+        float duration = 0.1f;
+        float time = 0;
+
+        // Mientras el tiempo acumulado sea menor a la duración total,
+        // interpolamos la escala del tile suavemente.
+        while (time < duration)
+        {
+            // Calcula el factor de interpolación entre 0 y 1.
+            float t = time / duration;
+            // Actualiza la escala del tile con un valor interpolado entre la escala original y la escala objetivo.
+            transform.localScale = Vector3.Lerp(originalScale, targetScale, t);
+            // Acumula el tiempo transcurrido.
+            time += Time.deltaTime;
+            // Espera el siguiente frame para continuar la interpolación.
+            yield return null;
+        }
+
+        // Aseguramos que la escala final sea exactamente la escala objetivo.
+        transform.localScale = targetScale;
+
+        // Destruye el objeto del tile tras terminar la animación.
+        Destroy(gameObject);
+    }
+}
